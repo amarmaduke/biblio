@@ -2370,7 +2370,6 @@ class BiblioApp {
             setTimeout(() => this.fillScreenWithCovers(), 50);
         }
         if (shelf) {
-            console.log("hmm");
             shelf.style.setProperty('--cover-size', size + 'px');
 
             setTimeout(() => this.fillScreenWithCovers(), 50);
