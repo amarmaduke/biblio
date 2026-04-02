@@ -199,6 +199,20 @@
             align-content: start;
         }
 
+        .books-shelf {
+            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 5px;
+        }
+
+        .book-shelf-item {
+            display: flex;
+            align-items: flex-end;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
         .book-item {
             display: flex;
             flex-direction: column;
@@ -208,6 +222,11 @@
         }
 
         .book-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .book-shelf-item:hover {
             transform: translateY(-5px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
@@ -226,6 +245,13 @@
             transition: width 0.1s, height 0.1s, margin-bottom 0.1s;
         }
 
+        .book-shelf-cover {
+            background-color: transparent;
+            overflow: hidden;
+            border: 1px solid #bdc3c7;
+            transition: width 0.1s, height 0.1s, margin-bottom 0.1s;
+        }
+
         .book-cover img {
             width: 100%;
             height: 100%;
@@ -233,7 +259,19 @@
             object-position: center;
         }
 
+        .book-shelf-cover img {
+            width: 100%;
+            height: 100%;
+        }
+
         .book-cover.no-image {
+            color: #95a5a6;
+            font-size: 12px;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .book-shelf-cover.no-image {
             color: #95a5a6;
             font-size: 12px;
             text-align: center;
@@ -256,6 +294,10 @@
         }
 
         .book-item.selected .book-cover {
+            border: 3px solid #3498db;
+        }
+
+        .book-shelf-item.selected .book-shelf-cover {
             border: 3px solid #3498db;
         }
 
@@ -536,6 +578,10 @@
                 grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
             }
 
+            .books-shelf {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+
             .book-cover {
                 width: 90px;
                 height: 120px;
@@ -654,6 +700,9 @@
             <div class="books-grid" id="booksGrid">
                 <div class="no-selection">Select a library to view books</div>
             </div>
+            <div class="books-shelf" id="booksShelf">
+                <div class="no-selection">Select a library to view books</div>
+            </div>
             <div class="books-table" id="booksTable" style="display: none;">
                 <table id="booksTableElement">
                     <thead>
@@ -764,12 +813,15 @@
                     <input type="radio" name="viewMode" value="grid" checked onchange="app.setViewMode('grid')"> Grid
                 </label>
                 <label>
+                    <input type="radio" name="viewMode" value="shelf" onchange="app.setViewMode('shelf')"> Shelf
+                </label>
+                <label>
                     <input type="radio" name="viewMode" value="table" onchange="app.setViewMode('table')"> Table
                 </label>
             </div>
             <div class="status-item" style="margin-left: 20px;" id="coverSizeItem">
                 <span>Cover Size:</span>
-                <input type="range" id="coverSizeSlider" min="50" max="250" value="120" step="10"
+                <input type="range" id="coverSizeSlider" min="50" max="500" value="120" step="10"
                     style="width: 150px; margin-left: 8px; margin-right: 8px; cursor: pointer;"
                     oninput="app.setCoverSize(this.value)">
                 <span id="coverSizeLabel" style="margin-left: 8px; min-width: 40px;">120</span>

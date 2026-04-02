@@ -1379,8 +1379,69 @@ class BiblioApp {
         // Check current view mode and render accordingly
         if (this.currentViewMode === 'table') {
             this.renderBooksTable();
+        } else if (this.currentViewMode === 'shelf') {
+            this.renderBooksShelf();
         } else {
             this.renderBooksGrid();
+        }
+    }
+
+    renderBooksShelf() {
+        const booksShelf = document.getElementById('booksShelf');
+
+        // Clear grid on first render
+        if (this.displayedBooksCount === 0) {
+            booksShelf.innerHTML = '';
+        }
+
+        if (this.filteredBooks.length === 0) {
+            booksShelf.innerHTML = '<div class="no-selection">No books found</div>';
+            return;
+        }
+
+        // Calculate how many books to display
+        const endIndex = Math.min(this.displayedBooksCount + this.booksPerPage, this.filteredBooks.length);
+        const booksToDisplay = this.filteredBooks.slice(this.displayedBooksCount, endIndex);
+
+        booksToDisplay.forEach(book => {
+            const bookItem = document.createElement('div');
+            
+            bookItem.className = 'book-shelf-item' + (this.selectedBook?.id === book.id ? ' selected' : '');
+            bookItem.style =
+                'width:calc(var(--cover-size,180px)/2.25 *' + book.shelf_width_percent + ');'
+                + 'height:calc(var(--cover-size,180px));'
+            bookItem.onclick = () => this.selectBook(book);
+
+            const coverDiv = document.createElement('div');
+            coverDiv.className = 'book-shelf-cover';
+            coverDiv.style =
+                'width:calc(var(--cover-size,180px)/2.25 *' + book.shelf_width_percent + ');'
+                + 'height:calc(var(--cover-size,180px) *' + book.shelf_height_percent + ");"
+
+            if (book.has_cover) {
+                const img = document.createElement('img');
+                img.src = `/api/libraries/${this.currentLibraryId}/books/${book.id}/cover`;
+                img.onerror = () => {
+                    img.parentElement.innerHTML = '<div class="no-image">No Cover</div>';
+                };
+                coverDiv.appendChild(img);
+            } else {
+                const img = document.createElement('img');
+                const authors = book.authors && book.authors.length > 0 ? book.authors[0] : 'Unknown Author';
+                img.src = this.generateTemporaryCover(book.title, authors);
+                coverDiv.appendChild(img);
+            }
+
+            bookItem.appendChild(coverDiv);
+            booksShelf.appendChild(bookItem);
+        });
+
+        this.displayedBooksCount = endIndex;
+        this.gridRenderedForLibrary = this.currentLibraryId;
+
+        // Setup infinite scroll on first render
+        if (this.displayedBooksCount === this.booksPerPage) {
+            this.setupShelfInfiniteScroll();
         }
     }
 
@@ -1441,6 +1502,35 @@ class BiblioApp {
         }
     }
 
+    setupShelfInfiniteScroll() {
+        const booksShelf = document.getElementById('booksShelf');
+
+        // Remove existing listener if any
+        booksShelf.removeEventListener('scroll', this.handleShelfScroll);
+
+        // Add new scroll listener
+        this.handleShelfScroll = () => {
+            if (this.isLoadingMore || this.displayedBooksCount >= this.filteredBooks.length) {
+                return;
+            }
+
+            const scrollTop = booksShelf.scrollTop;
+            const scrollHeight = booksShelf.scrollHeight;
+            const clientHeight = booksShelf.clientHeight;
+
+            // Load more books when user scrolls to 80% of the way down
+            if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+                this.isLoadingMore = true;
+                setTimeout(() => {
+                    this.renderBooksShelf();
+                    this.isLoadingMore = false;
+                }, 100);
+            }
+        };
+
+        booksShelf.addEventListener('scroll', this.handleShelfScroll);
+    }
+
     setupInfiniteScroll() {
         const booksGrid = document.getElementById('booksGrid');
 
@@ -1481,6 +1571,11 @@ class BiblioApp {
             item.classList.remove('selected');
         });
 
+        // Update selected styling for shelf view
+        document.querySelectorAll('.book-shelf-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+
         // Update selected styling for table view
         document.querySelectorAll('.books-table tbody tr').forEach(row => {
             row.classList.remove('selected');
@@ -1491,6 +1586,14 @@ class BiblioApp {
             // For grid view, try to find the element that was clicked
             if (event && event.target) {
                 const bookItem = event.target.closest('.book-item');
+                if (bookItem) {
+                    bookItem.classList.add('selected');
+                }
+            }
+        } else if (this.currentViewMode === 'shelf') {
+            // For shelf view, try to find the element that was clicked
+            if (event && event.target) {
+                const bookItem = event.target.closest('.book-shelf-item');
                 if (bookItem) {
                     bookItem.classList.add('selected');
                 }
@@ -1528,6 +1631,18 @@ class BiblioApp {
                         break;
                     }
                 }
+                // Highlight the book in the shelf if visible
+                document.querySelectorAll('.book-shelf-item').forEach(item => {
+                    item.classList.remove('selected');
+            });
+                // Find and highlight the book item
+                const bookShelfItems = document.querySelectorAll('.book-shelf-item');
+                for (let item of bookShelfItems) {
+                    if (item.querySelector('img')?.src?.includes(`/books/${this.selectedBookId}/`)) {
+                        item.classList.add('selected');
+                        break;
+                    }
+                }
             } else {
                 // Book is not in the current library
                 // Show the first book of the current library if there is one
@@ -1546,6 +1661,13 @@ class BiblioApp {
                     const bookItems = document.querySelectorAll('.book-item');
                     if (bookItems.length > 0) {
                         bookItems[0].classList.add('selected');
+                    }
+                    document.querySelectorAll('.book-shelf-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    const bookShelfItems = document.querySelectorAll('.book-shelf-item');
+                    if (bookShelfItems.length > 0) {
+                        bookShelfItems[0].classList.add('selected');
                     }
                 } else {
                     // No books in current library, keep it clear
@@ -2095,14 +2217,17 @@ class BiblioApp {
 
     updateViewDisplay() {
         const booksGrid = document.getElementById('booksGrid');
+        const booksShelf = document.getElementById('booksShelf');
         const booksTable = document.getElementById('booksTable');
         const gridRadio = document.querySelector('input[name="viewMode"][value="grid"]');
+        const shelfRadio = document.querySelector('input[name="viewMode"][value="shelf"]')
         const tableRadio = document.querySelector('input[name="viewMode"][value="table"]');
         const columnVisibilityItem = document.getElementById('columnVisibilityItem');
         const coverSizeItem = document.getElementById('coverSizeItem');
 
         if (this.currentViewMode === 'grid') {
             booksGrid.style.display = 'grid';
+            booksShelf.style.display = 'none';
             booksTable.style.display = 'none';
             if (gridRadio) gridRadio.checked = true;
             if (columnVisibilityItem) columnVisibilityItem.style.display = 'none';
@@ -2115,8 +2240,24 @@ class BiblioApp {
             this.displayedBooksCount = 0;
             this.renderBooks();
             this.setupInfiniteScroll();
+        } else if (this.currentViewMode === 'shelf') {
+            // TODO: uncertain about this
+            booksGrid.style.display = 'none';
+            booksShelf.style.display = 'flex';
+            booksTable.style.display = 'none';
+            if (shelfRadio) shelfRadio.checked = true;
+            if (columnVisibilityItem) columnVisibilityItem.style.display = 'none';
+            if (coverSizeItem) coverSizeItem.style.display = 'flex';
+
+            // Apply current cover size (set CSS custom properties)
+            this.applyCoverSizeCSS();
+
+            this.displayedBooksCount = 0;
+            this.renderBooksShelf();
+            this.setupShelfInfiniteScroll();
         } else {
             booksGrid.style.display = 'none';
+            booksShelf.style.display = 'none';
             booksTable.style.display = 'flex';
             if (tableRadio) tableRadio.checked = true;
             if (columnVisibilityItem) columnVisibilityItem.style.display = 'flex';
@@ -2207,6 +2348,7 @@ class BiblioApp {
     applyCoverSizeCSS() {
         const size = this.coverSize;
         const grid = document.getElementById('booksGrid');
+        const shelf = document.getElementById('booksShelf');
         if (grid) {
             // Calculate proportional spacing based on default 120px with 15px gap
             // Ratio: 15/120 = 0.125 for gap, 8/120 = 0.067 for margin
@@ -2227,6 +2369,12 @@ class BiblioApp {
             // After CSS properties are applied, check if we need to load more books to fill screen
             setTimeout(() => this.fillScreenWithCovers(), 50);
         }
+        if (shelf) {
+            console.log("hmm");
+            shelf.style.setProperty('--cover-size', size + 'px');
+
+            setTimeout(() => this.fillScreenWithCovers(), 50);
+        }
 
         // Update range slider and label
         const slider = document.getElementById('coverSizeSlider');
@@ -2236,11 +2384,15 @@ class BiblioApp {
     }
 
     fillScreenWithCovers() {
-        const booksGrid = document.getElementById('booksGrid');
-        if (!booksGrid || this.currentViewMode !== 'grid') return;
+        const grid = document.getElementById('booksGrid');
+        const shelf = document.getElementById('booksShelf');
+        if (this.currentViewMode === 'table') return;
 
-        const scrollHeight = booksGrid.scrollHeight;
-        const clientHeight = booksGrid.clientHeight;
+        let container = grid;
+        if (this.currentViewMode === 'shelf') { container = shelf } 
+
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
 
         // If there's vertical space available and we have more books to load, load them
         if (scrollHeight <= clientHeight && this.displayedBooksCount < this.filteredBooks.length) {

@@ -24,3 +24,4 @@ argon2 = "0.5"
 rustls = "0.23"
 rustls-pemfile = "2.1"
 actix-web-httpauth = "0.8"
+xxhash-rust = { version = "0.8.12", features = ["xxh3"] }
